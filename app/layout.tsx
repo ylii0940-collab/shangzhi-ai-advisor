@@ -6,15 +6,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const imageUrl = `${protocol}://${host}/og.png`;
+  const imageUrl = `${protocol}://${host}/og-v2.png`;
 
   return {
     title: "商智 · AI 经营顾问",
-    description: "为本地生活商家提供实时经营诊断、策略建议与行动闭环。",
+    description: "从商家经营诊断到 Prompt 实验、A/B 测试与模型评测的完整 AI 产品闭环。",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
       title: "商智 · AI 经营顾问",
-      description: "让每个经营决策，都有数据依据。",
+      description: "从 Prompt 实验到业务增长。",
       type: "website",
       locale: "zh_CN",
       images: [{ url: imageUrl, width: 1200, height: 630, alt: "商智 AI 经营顾问" }],
@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "商智 · AI 经营顾问",
-      description: "让每个经营决策，都有数据依据。",
+      description: "从 Prompt 实验到业务增长。",
       images: [imageUrl],
     },
   };
