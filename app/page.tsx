@@ -4,7 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 
 type Message = { role: "assistant" | "merchant"; text: string };
 
-const navItems = ["经营总览", "策略看板", "A/B 实验", "标注评测", "Prompt 管理"];
+const navItems = ["经营总览", "调研策略", "策略看板", "A/B 实验", "实验配置", "标注工作台", "作品集资料"];
 
 const funnel = [
   { label: "消息送达", value: "48,260", rate: "100%" },
@@ -86,6 +86,11 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [taskCreated, setTaskCreated] = useState(false);
   const [notice, setNotice] = useState("");
+  const [industry, setIndustry] = useState("餐饮");
+  const [traffic, setTraffic] = useState(50);
+  const [annotationIndex, setAnnotationIndex] = useState(0);
+  const [scores, setScores] = useState([4, 5, 4, 4, 5, 4, 5, 5]);
+  const [severeError, setSevereError] = useState(false);
 
   const response = useMemo(
     () =>
@@ -119,10 +124,12 @@ export default function Home() {
     setActiveNav(item);
     const sectionId: Record<string, string> = {
       "经营总览": "overview",
+      "调研策略": "research-strategy",
       "策略看板": "strategy-dashboard",
       "A/B 实验": "ab-experiment",
-      "标注评测": "evaluation",
-      "Prompt 管理": "prompt-management",
+      "实验配置": "experiment-builder",
+      "标注工作台": "annotation-workbench",
+      "作品集资料": "portfolio-assets",
     };
     window.setTimeout(() => document.getElementById(sectionId[item])?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
@@ -145,9 +152,9 @@ export default function Home() {
               onClick={() => navigateTo(item)}
               className={activeNav === item ? "nav-item active" : "nav-item"}
             >
-              <span className="nav-icon">{["⌂", "▥", "A", "✓", "✦"][index]}</span>
+              <span className="nav-icon">{["⌂", "◎", "▥", "A", "⚗", "✓", "↓"][index]}</span>
               {item}
-              {item === "标注评测" && <em>3</em>}
+              {item === "标注工作台" && <em>7</em>}
             </button>
           ))}
         </nav>
@@ -296,6 +303,21 @@ export default function Home() {
             <div className="suite-status"><span /> 数据更新于 10 分钟前</div>
           </div>
 
+          <section className="panel research-panel section-anchor" id="research-strategy">
+            <div className="panel-header strategy-heading">
+              <div><span className="module-index">01 / DISCOVERY</span><h2>商家调研与行业差异化策略</h2><p>5 位模拟访谈对象 · 3 个细分行业 · 结论用于原型验证，不代表真实线上调研</p></div>
+              <div className="industry-tabs" role="tablist">{["餐饮","零售","休闲娱乐"].map(item => <button role="tab" aria-selected={industry===item} className={industry===item?"selected":""} onClick={()=>setIndustry(item)} key={item}>{item}</button>)}</div>
+            </div>
+            <div className="research-grid">
+              <article className="persona-card"><div className="persona-head"><div className="holo-avatar">{industry.slice(0,1)}</div><div><span>核心用户画像</span><h3>{industry === "餐饮" ? "李店长 · 单店经营者" : industry === "零售" ? "周老板 · 社区零售商" : "陈经理 · 娱乐门店运营"}</h3><p>{industry === "餐饮" ? "每天只能抽出 20 分钟看数据，希望系统直接告诉他先做什么。" : industry === "零售" ? "SKU多、库存周转慢，最关心哪些商品需要补货或促销。" : "工作日闲时利用率低，希望通过预约与分时活动提升产能。"}</p></div></div><blockquote>“{industry === "餐饮" ? "别只告诉我转化下降，告诉我是套餐、评价还是价格的问题。" : industry === "零售" ? "我不缺报表，缺的是今天该处理哪十个商品。" : "周末不缺客流，最难的是怎么把工作日下午卖出去。"}”</blockquote></article>
+              <div className="insight-stack">
+                {(industry === "餐饮" ? [["套餐转化","高频","价格/分量/差评联动"],["评价管理","高痛","负向主题与回复"],["老客复购","增长","定向召回与券包"]] : industry === "零售" ? [["库存积压","高频","滞销诊断与清仓"],["爆款缺货","高痛","库存水位提醒"],["选品促销","增长","SKU级行动建议"]] : [["闲时利用","高频","分时定价与券包"],["预约爽约","高痛","预测与提醒"],["组合套餐","增长","场景化活动设计"]]).map(([title,badge,desc],i)=><article key={title}><span className={`insight-no n${i+1}`}>0{i+1}</span><div><strong>{title}</strong><p>{desc}</p></div><b>{badge}</b></article>)}
+              </div>
+              <aside className="interview-summary"><span>访谈样本</span>{[["李记小馆","餐饮 · 1店","18分钟"],["悦己便利","零售 · 3店","26分钟"],["乐玩桌游","休闲 · 2店","22分钟"],["巷口咖啡","餐饮 · 2店","20分钟"],["轻享SPA","休闲 · 4店","31分钟"]].map(([name,type,time])=><div key={name}><i>{name.slice(0,1)}</i><p><strong>{name}</strong><small>{type}</small></p><span>{time}</span></div>)}</aside>
+            </div>
+            <div className="journey-line">{["发现异常","理解原因","评估方案","确认执行","复盘效果"].map((step,i)=><div key={step}><span>{i+1}</span><strong>{step}</strong><small>{["主动提醒","证据解释","影响/风险","二次确认","增量归因"][i]}</small></div>)}</div>
+          </section>
+
           <section className="panel strategy-panel section-anchor" id="strategy-dashboard">
             <div className="panel-header strategy-heading">
               <div><h2>商家沟通转化漏斗</h2><p>餐饮行业 · 近 30 天 · 已排除无效及测试商家</p></div>
@@ -350,6 +372,21 @@ export default function Home() {
             </div>
           </section>
 
+          <section className="panel experiment-builder section-anchor" id="experiment-builder">
+            <div className="panel-header strategy-heading"><div><span className="module-index">04 / EXPERIMENT BUILDER</span><h2>创建商家沟通策略实验</h2><p>完整配置触发条件、目标人群、Prompt、指标与安全护栏</p></div><span className="draft-badge">草稿自动保存</span></div>
+            <div className="builder-steps">{["实验目标","人群与触发","策略与流量","指标与护栏"].map((step,i)=><div className={i<3?"done":"current"} key={step}><span>{i<3?"✓":i+1}</span><strong>{step}</strong></div>)}</div>
+            <div className="builder-layout">
+              <div className="builder-form">
+                <label><span>实验名称</span><input defaultValue="经营异常具体损失型开场验证" /></label>
+                <div className="form-pair"><label><span>目标行业</span><select><option>餐饮商家</option><option>零售商家</option><option>休闲娱乐</option></select></label><label><span>商家阶段</span><select><option>新商家 + 成长商家</option><option>全部商家</option><option>成熟商家</option></select></label></div>
+                <label><span>触发条件</span><div className="condition-box"><b>当</b><select><option>套餐支付转化率</option></select><select><option>连续7日下降</option></select><input defaultValue="10%" /><button>＋</button></div></label>
+                <div className="prompt-pair"><label><span>A组 · 基线Prompt</span><textarea defaultValue="您最近的经营数据存在异常，点击查看详情。" /></label><label><span>B组 · 实验Prompt</span><textarea defaultValue="您的套餐曝光上涨{{exposure_lift}}，但每天少成交约{{lost_orders}}单，可能与{{reason}}有关。我整理了3条优化建议。" /></label></div>
+              </div>
+              <aside className="traffic-card"><span>流量分配</span><div className="traffic-orbit"><strong>{traffic}%</strong><small>B组流量</small></div><input type="range" min="10" max="90" value={traffic} onChange={e=>setTraffic(Number(e.target.value))}/><div className="traffic-labels"><span>A组 {100-traffic}%</span><span>B组 {traffic}%</span></div><dl><div><dt>预计样本量</dt><dd>48,000</dd></div><div><dt>预计周期</dt><dd>14天</dd></div><div><dt>最小检测效应</dt><dd>+3.0pp</dd></div></dl></aside>
+            </div>
+            <div className="metric-selector"><div><span>主要指标</span>{["商家回复率","建议采纳率","任务完成率"].map(x=><label key={x}><input type="checkbox" defaultChecked />{x}</label>)}</div><div><span>护栏指标</span>{["退订率 < 0.8%","投诉率 < 0.2%","错误建议率 < 1%","人工转接率 < 8%"].map(x=><label key={x}><input type="checkbox" defaultChecked />{x}</label>)}</div><button onClick={()=>setNotice("实验草稿已创建，可进入审批流程")}>创建实验草稿 →</button></div>
+          </section>
+
           <section className="panel evaluation-panel section-anchor" id="evaluation">
             <div className="panel-header strategy-heading">
               <div><h2>模型标注与评测</h2><p>评测集 v2.4 · 236 条商家案例 · 餐饮 / 零售 / 休闲娱乐</p></div>
@@ -389,6 +426,20 @@ export default function Home() {
               {[["离线评测 ≥ 4.5",true],["错误建议率 < 1%",true],["高风险确认覆盖率 100%",true],["A/B 实验显著性 > 95%",true],["投诉率无显著上升",true],["人工审核 100 条",true],["零售行业回归测试",false],["负责人最终审批",false]].map(([label,passed]) => <div className="check-row" key={label as string}><span className={passed ? "passed" : "waiting"}>{passed ? "✓" : "○"}</span><strong>{label}</strong><small>{passed ? "通过" : "待完成"}</small></div>)}
               <button className="release-button" disabled>完成检查后发布</button>
             </div>
+          </section>
+
+          <section className="panel annotation-workbench section-anchor" id="annotation-workbench">
+            <div className="panel-header strategy-heading"><div><span className="module-index">05 / HUMAN EVALUATION</span><h2>模型标注工作台</h2><p>CASE-{String(annotationIndex+86).padStart(4,"0")} · 150 条模拟评测集 · 当前进度 {annotationIndex+1}/150</p></div><div className="annotator"><span>标注员</span><strong>Reviewer 02</strong></div></div>
+            <div className="annotation-layout">
+              <div className="case-context"><header><span>商家案例</span><b>零售 · 库存积压 · 高风险</b></header><dl><div><dt>经营事实</dt><dd>即饮咖啡库存周转天数由 21 天升至 46 天，近 14 日销量下降 32%，毛利率 18%。</dd></div><div><dt>约束条件</dt><dd>商家最低可接受毛利率为 12%；价格或预算调整必须二次确认。</dd></div></dl><div className="model-answer"><span>模型回答 · Prompt v2.5-rc1</span><p>建议将即饮咖啡统一降价30%并立即上线清仓活动，预计7天内清理80%库存。</p></div><div className="evidence-alert"><span>!</span><p><strong>自动风险提示</strong>：建议价格会使毛利率低于商家约束，且包含未经依据验证的效果承诺。</p></div></div>
+              <div className="score-form"><header><span>八维评分</span><small>1 = 严重不符合 · 5 = 完全符合</small></header>{["问题判断准确","数据引用正确","建议可执行","符合行业特点","无虚构数据","语气适合商家","无违规承诺","高风险操作确认"].map((name,i)=><div className="score-row-form" key={name}><span>{name}</span><div>{[1,2,3,4,5].map(score=><button className={scores[i]===score?"active":""} onClick={()=>setScores(current=>current.map((v,idx)=>idx===i?score:v))} key={score}>{score}</button>)}</div></div>)}</div>
+              <aside className="error-panel"><span>严重错误标签</span>{["违反商家约束","虚构效果承诺","未要求二次确认","可能造成经济损失"].map(x=><label key={x}><input type="checkbox" checked={severeError} onChange={()=>setSevereError(!severeError)} />{x}</label>)}<label className="note-label"><span>标注说明</span><textarea defaultValue="建议改为分层折扣实验，并先测算12%毛利率约束下的最大折扣；上线前必须由商家确认。" /></label><div className="score-total"><span>综合得分</span><strong>{(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2)}</strong></div><button onClick={()=>{setAnnotationIndex(i=>Math.min(149,i+1));setNotice("标注已提交，已进入下一条案例")}}>提交并进入下一条</button></aside>
+            </div>
+          </section>
+
+          <section className="portfolio-panel section-anchor" id="portfolio-assets">
+            <div><span className="module-index">06 / DELIVERABLES</span><h2>求职作品集资料包</h2><p>从需求研究到评测数据，所有材料均可下载复盘。模拟数据已在文件中明确标注。</p></div>
+            <div className="asset-grid"><a href="/assets/shangzhi-prd.docx" download><span>DOCX</span><strong>完整PRD</strong><small>背景、流程、需求、埋点、风险</small></a><a href="/assets/shangzhi-portfolio.pptx" download><span>PPTX</span><strong>面试汇报PPT</strong><small>12页完整项目故事线</small></a><a href="/assets/shangzhi-evaluation-dataset.xlsx" download><span>XLSX</span><strong>150条评测数据集</strong><small>案例、回答、八维评分与标签</small></a></div>
           </section>
         </section>
       </section>
