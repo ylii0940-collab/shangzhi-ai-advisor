@@ -48,6 +48,18 @@ AGENT_API_URL=http://127.0.0.1:8000
 如果没有配置 `AGENT_API_URL`，完整页面仍会以明确标识的 `DEMO` 模式运行；
 如果 Python 服务暂时不可用，会显示 `FALLBACK`，不会伪装成真实模型。
 
+## 免费公开部署
+
+登录 Cloudflare 后运行：
+
+```bash
+npm run deploy:cloudflare
+```
+
+会生成不含 `chatgpt` 字样的免费 `workers.dev` 地址。该部署默认使用 DEMO
+Agent；要连接公网 Python LangGraph 服务，需要在 Worker 中配置
+`AGENT_API_URL`。
+
 ## 构建
 
 ```bash
