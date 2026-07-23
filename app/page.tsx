@@ -172,7 +172,7 @@ export default function Home() {
   const [agentError, setAgentError] = useState("");
   const [threadId, setThreadId] = useState("");
   const [actionStates, setActionStates] = useState<Record<string, "approved" | "rejected">>({});
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [liveTick, setLiveTick] = useState(0);
   const [reportExpanded, setReportExpanded] = useState(false);
   const [tasksDone, setTasksDone] = useState([true, true, false, false]);
@@ -426,8 +426,12 @@ export default function Home() {
         <header className="topbar">
           <div>
             <p className="eyebrow">
-              {currentTime.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
-              <span className="live-clock">{currentTime.toLocaleTimeString("zh-CN", { hour12: false })}</span>
+              {currentTime
+                ? currentTime.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" })
+                : "经营数据工作台"}
+              <span className="live-clock">
+                {currentTime ? currentTime.toLocaleTimeString("zh-CN", { hour12: false }) : "--:--:--"}
+              </span>
             </p>
             <h1>早上好，李店长</h1>
           </div>
