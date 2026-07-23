@@ -70,6 +70,10 @@ SHANGZHI_AGENT_MODE=auto
 - SSE 流式返回 Agent 节点进度；
 - 内置离线回退和可运行评测集；
 - 请求限流、输入长度限制和后端密钥隔离。
+- Agent 四类能力评测：规划、工具调用、记忆与对话体验；
+- Badcase 分类、根因、修复方案和专项回归接口；
+- 匿名竞品 Agent 统一任务对比与机会分析；
+- 调用量、延迟、成本、工具健康、回退和确认覆盖率监控。
 
 ## 主要目录
 
@@ -102,6 +106,11 @@ tests/                     单元与集成测试
 - `GET /api/agent/traces`
 - `POST /api/evals/run`
 - `GET /api/evals/summary`
+- `GET /api/evals/capabilities`
+- `GET /api/badcases`
+- `POST /api/badcases/{case_id}/regression`
+- `GET /api/competitors`
+- `GET /api/observability`
 - `GET /api/dashboard`
 - `POST /api/experiment/calculate`
 - `POST /api/annotations`

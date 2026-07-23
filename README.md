@@ -5,6 +5,13 @@
 后端位于 `python_shangzhi/`，使用 FastAPI、LangChain、LangGraph、OpenAI
 Responses API、SQLite 记忆和人工确认门。
 
+面向 AI Agent 策略产品岗位，项目额外包含：
+
+- 规划、工具调用、记忆、对话体验四类能力评测；
+- Badcase 分类、根因定位、修复方案与回归闭环；
+- 匿名竞品统一任务测试与能力对比；
+- 调用量、成本、延迟、工具健康、回退和人工确认监控。
+
 ## Prerequisites
 
 - Node.js `>=22.13.0`

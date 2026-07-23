@@ -24,6 +24,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from agent import AgentService, Settings
+from agent.analytics import (
+    CAPABILITY_REPORT,
+    COMPETITOR_REPORT,
+    OBSERVABILITY_REPORT,
+    list_badcases,
+    run_badcase_regression,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -277,6 +284,36 @@ def run_evaluation(request: Request) -> dict[str, Any]:
 @app.get("/api/evals/summary")
 def evaluation_summary() -> dict[str, Any]:
     return {"ok": True, "summary": agent_service.eval_summary()}
+
+
+@app.get("/api/evals/capabilities")
+def capability_evaluation() -> dict[str, Any]:
+    return {"ok": True, "report": CAPABILITY_REPORT}
+
+
+@app.get("/api/badcases")
+def badcases(status: str | None = None) -> dict[str, Any]:
+    return {"ok": True, "cases": list_badcases(status)}
+
+
+@app.post("/api/badcases/{case_id}/regression")
+def badcase_regression(case_id: str, request: Request) -> dict[str, Any]:
+    check_rate_limit(request)
+    try:
+        result = run_badcase_regression(case_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Badcase 不存在") from error
+    return {"ok": True, "result": result}
+
+
+@app.get("/api/competitors")
+def competitor_analysis() -> dict[str, Any]:
+    return {"ok": True, "report": COMPETITOR_REPORT}
+
+
+@app.get("/api/observability")
+def agent_observability() -> dict[str, Any]:
+    return {"ok": True, "report": OBSERVABILITY_REPORT}
 
 
 @app.post("/api/experiment/calculate")

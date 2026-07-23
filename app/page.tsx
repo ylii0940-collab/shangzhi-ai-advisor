@@ -50,7 +50,7 @@ type AgentResult = {
 type AgentStep = { node: string; label: string; status: string };
 type Message = { role: "assistant" | "merchant"; text: string; agent?: AgentResult };
 
-const navItems = ["经营总览", "调研策略", "策略看板", "A/B 实验", "实验配置", "标注工作台", "作品集资料"];
+const navItems = ["经营总览", "调研策略", "策略看板", "A/B 实验", "实验配置", "能力评测", "Badcase中心", "竞品拆解", "运行监控", "标注工作台", "作品集资料"];
 
 const funnel = [
   { label: "消息送达", value: "48,260", rate: "100%" },
@@ -72,6 +72,111 @@ const strategyMetrics = [
 const evalDimensions = [
   ["问题判断准确", 4.62], ["数据引用正确", 4.81], ["建议可执行", 4.38], ["符合行业特点", 4.26],
   ["无虚构数据", 4.75], ["语气适合商家", 4.53], ["无违规承诺", 4.89], ["高风险操作确认", 4.94],
+];
+
+const capabilityGroups = [
+  {
+    name: "规划能力",
+    score: 86.4,
+    delta: "+4.8pp",
+    summary: "目标拆解稳定，信息不足时的追问仍需加强",
+    metrics: [["任务拆解准确率", 91], ["步骤顺序合理率", 88], ["计划动态调整率", 79], ["约束遵循率", 87]],
+  },
+  {
+    name: "工具调用",
+    score: 92.1,
+    delta: "+2.6pp",
+    summary: "选工具准确，复杂参数和失败重试仍是主要 Badcase 来源",
+    metrics: [["工具选择准确率", 96], ["参数正确率", 91], ["失败重试成功率", 84], ["结果引用正确率", 97]],
+  },
+  {
+    name: "记忆能力",
+    score: 88.7,
+    delta: "+6.1pp",
+    summary: "商家约束记忆表现良好，过期信息识别需要专项回归",
+    metrics: [["跨轮事实一致性", 94], ["偏好记忆准确率", 90], ["过期信息识别率", 78], ["商家隔离正确率", 99]],
+  },
+  {
+    name: "对话体验",
+    score: 89.5,
+    delta: "+3.4pp",
+    summary: "证据表达清晰，拒答后的替代方案完整度有提升空间",
+    metrics: [["意图理解准确率", 95], ["有效追问率", 83], ["建议可执行率", 91], ["商家满意度", 89]],
+  },
+];
+
+const badcaseSeed = [
+  {
+    id: "BC-0241",
+    scenario: "零售 · 库存积压",
+    title: "折扣建议突破最低毛利约束",
+    category: "规划 / 约束遗漏",
+    severity: "S1",
+    status: "待修复",
+    owner: "Agent 策略",
+    version: "v2.5-rc1",
+    actual: "建议统一降价 30%，预计 7 天清理 80% 库存。",
+    expected: "先测算 12% 最低毛利约束下的最大折扣，再创建小流量实验并请求商家确认。",
+    rootCause: ["库存与销量工具返回正确", "规划节点未引用毛利约束", "生成节点产生效果承诺", "风控规则未覆盖库存清仓场景"],
+    fix: "将毛利约束写入 Planner 必选字段，并新增折扣后毛利校验器。",
+  },
+  {
+    id: "BC-0237",
+    scenario: "餐饮 · 评价回复",
+    title: "批量回复工具参数缺少评价 ID",
+    category: "工具调用 / 参数",
+    severity: "S2",
+    status: "回归中",
+    owner: "Agent 工程",
+    version: "v2.4",
+    actual: "调用 reply_reviews 时仅传入主题标签，导致工具返回 parameter_missing。",
+    expected: "先检索评价 ID，展示 10 条回复预览，商家确认后再批量提交。",
+    rootCause: ["意图识别正确", "工具选择正确", "Planner 未补齐评价 ID", "重试策略重复使用错误参数"],
+    fix: "增加工具参数 Schema 校验，并在缺少评价 ID 时自动回到检索节点。",
+  },
+  {
+    id: "BC-0229",
+    scenario: "多轮对话 · 预算调整",
+    title: "沿用已过期的上月预算上限",
+    category: "记忆 / 过期信息",
+    severity: "S2",
+    status: "已修复",
+    owner: "模型评测",
+    version: "v2.4",
+    actual: "使用上月 500 元预算上限，忽略本轮新输入的 800 元约束。",
+    expected: "优先采用当前轮明确输入，并将旧记忆标记为已过期。",
+    rootCause: ["历史记忆召回成功", "当前轮约束抽取成功", "冲突消解规则优先级配置错误", "回答引用旧值"],
+    fix: "明确当前轮事实 > 已确认记忆 > 历史推断的优先级，并加入冲突回归集。",
+  },
+  {
+    id: "BC-0218",
+    scenario: "休闲娱乐 · 闲时活动",
+    title: "信息不足时直接生成活动方案",
+    category: "对话 / 缺少追问",
+    severity: "S3",
+    status: "待分析",
+    owner: "产品策略",
+    version: "v2.5-rc1",
+    actual: "未确认可用时段、客单价和券预算，直接生成工作日下午券包。",
+    expected: "先追问可用时段、目标客单和预算上限，再生成候选方案。",
+    rootCause: ["识别到闲时利用问题", "缺失字段检测未触发", "Planner 将默认值当作确认事实", "方案可执行性不足"],
+    fix: "为活动场景增加三项必填槽位，信息不足时进入澄清状态。",
+  },
+];
+
+const competitors = [
+  { name: "商智 Agent", label: "本项目", planning: 86, tools: 92, memory: 89, dialogue: 90, safety: 96, tone: "ours" },
+  { name: "行业 Agent A", label: "电商经营助手", planning: 91, tools: 88, memory: 82, dialogue: 86, safety: 90, tone: "a" },
+  { name: "行业 Agent B", label: "营销投放助手", planning: 83, tools: 94, memory: 76, dialogue: 81, safety: 87, tone: "b" },
+];
+
+const monitorMetrics = [
+  ["日调用量", "18,642", "+12.8%", "calls"],
+  ["P95 响应时间", "4.8s", "-0.7s", "latency"],
+  ["工具调用成功率", "96.7%", "+1.4pp", "tools"],
+  ["单次平均成本", "¥0.084", "-9.2%", "cost"],
+  ["模型回退率", "1.8%", "-0.6pp", "fallback"],
+  ["人工确认覆盖率", "100%", "持平", "confirm"],
 ];
 
 const alerts = [
@@ -172,6 +277,13 @@ export default function Home() {
   const [agentError, setAgentError] = useState("");
   const [threadId, setThreadId] = useState("");
   const [actionStates, setActionStates] = useState<Record<string, "approved" | "rejected">>({});
+  const [capabilityRun, setCapabilityRun] = useState({ running: false, progress: 0, completed: 236 });
+  const [selectedBadcase, setSelectedBadcase] = useState(0);
+  const [badcaseStatuses, setBadcaseStatuses] = useState<Record<string, string>>(
+    Object.fromEntries(badcaseSeed.map((item) => [item.id, item.status])),
+  );
+  const [activeCompetitor, setActiveCompetitor] = useState(0);
+  const [monitorWindow, setMonitorWindow] = useState("24 小时");
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [liveTick, setLiveTick] = useState(0);
   const [reportExpanded, setReportExpanded] = useState(false);
@@ -204,6 +316,10 @@ export default function Home() {
       "strategy-dashboard": "策略看板",
       "ab-experiment": "A/B 实验",
       "experiment-builder": "实验配置",
+      "capability-evaluation": "能力评测",
+      "badcase-center": "Badcase中心",
+      "competitive-lab": "竞品拆解",
+      "agent-monitoring": "运行监控",
       "annotation-workbench": "标注工作台",
       "portfolio-assets": "作品集资料",
     };
@@ -348,6 +464,34 @@ export default function Home() {
     }
   }
 
+  function runCapabilityEvaluation() {
+    if (capabilityRun.running) return;
+    setCapabilityRun((current) => ({ ...current, running: true, progress: 8 }));
+    [28, 52, 76, 100].forEach((progress, index) => {
+      window.setTimeout(() => {
+        setCapabilityRun((current) => ({
+          running: progress < 100,
+          progress,
+          completed: progress === 100 ? current.completed + 12 : current.completed,
+        }));
+        if (progress === 100) {
+          setNotice("12 条 Agent 专项回归完成：11 条通过，1 条进入 Badcase");
+          window.setTimeout(() => setNotice(""), 2600);
+        }
+      }, 420 * (index + 1));
+    });
+  }
+
+  function rerunBadcase(caseId: string) {
+    setBadcaseStatuses((current) => ({ ...current, [caseId]: "回归中" }));
+    setNotice(`${caseId} 已进入 v2.5-rc2 回归队列`);
+    window.setTimeout(() => {
+      setBadcaseStatuses((current) => ({ ...current, [caseId]: "已修复" }));
+      setNotice(`${caseId} 回归通过，修复已关闭`);
+      window.setTimeout(() => setNotice(""), 2200);
+    }, 1500);
+  }
+
   function toggleTask(index: number) {
     setTasksDone((current) => current.map((done, taskIndex) => taskIndex === index ? !done : done));
     setNotice("待办状态已更新");
@@ -372,6 +516,10 @@ export default function Home() {
       "策略看板": "strategy-dashboard",
       "A/B 实验": "ab-experiment",
       "实验配置": "experiment-builder",
+      "能力评测": "capability-evaluation",
+      "Badcase中心": "badcase-center",
+      "竞品拆解": "competitive-lab",
+      "运行监控": "agent-monitoring",
       "标注工作台": "annotation-workbench",
       "作品集资料": "portfolio-assets",
     };
@@ -405,7 +553,7 @@ export default function Home() {
               onClick={() => navigateTo(item)}
               className={activeNav === item ? "nav-item active" : "nav-item"}
             >
-              <span className="nav-icon">{["⌂", "◎", "▥", "A", "⚗", "✓", "↓"][index]}</span>
+              <span className="nav-icon">{["⌂", "◎", "▥", "A", "⚗", "◇", "!", "⊕", "⌁", "✓", "↓"][index]}</span>
               {item}
               {item === "标注工作台" && <em>7</em>}
             </button>
@@ -773,8 +921,219 @@ export default function Home() {
             </div>
           </section>
 
+          <section className="panel capability-panel section-anchor" id="capability-evaluation">
+            <div className="panel-header strategy-heading">
+              <div>
+                <span className="module-index">05 / AGENT EVALUATION</span>
+                <h2>Agent 四类能力评测</h2>
+                <p>评测集 v2.5 · {capabilityRun.completed} 条 · 规划、工具、记忆、对话体验专项回归</p>
+              </div>
+              <button className="capability-run" onClick={runCapabilityEvaluation} disabled={capabilityRun.running}>
+                {capabilityRun.running ? `评测运行中 ${capabilityRun.progress}%` : "运行 12 条专项回归"}
+              </button>
+            </div>
+            <div className="eval-runner">
+              <div>
+                <span>候选版本</span>
+                <strong>Prompt v2.5-rc2 · gpt-5.6-luna</strong>
+                <small>基准版本 v2.4 · 相同数据快照 · Temperature 固定</small>
+              </div>
+              <div className="eval-progress"><i style={{ width: `${capabilityRun.progress || 100}%` }} /></div>
+              <dl>
+                <div><dt>综合通过率</dt><dd>91.8%</dd></div>
+                <div><dt>严重错误召回</dt><dd>96.4%</dd></div>
+                <div><dt>平均单例成本</dt><dd>¥0.071</dd></div>
+              </dl>
+            </div>
+            <div className="capability-grid">
+              {capabilityGroups.map((group, groupIndex) => (
+                <article className="capability-card" key={group.name}>
+                  <header>
+                    <div className={`capability-orb c${groupIndex + 1}`}><strong>{group.score}</strong><small>/ 100</small></div>
+                    <div><span>0{groupIndex + 1}</span><h3>{group.name}</h3><b>{group.delta}</b></div>
+                  </header>
+                  <p>{group.summary}</p>
+                  <div className="capability-metrics">
+                    {group.metrics.map(([name, value]) => (
+                      <div key={name as string}><span>{name}</span><i><b style={{ width: `${value}%` }} /></i><strong>{value}%</strong></div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="capability-cases">
+              <header><strong>专项用例覆盖</strong><span>最后运行：今天 15:42 · 数据均为模拟评测</span></header>
+              {[
+                ["复杂任务规划", "36 条", "33 通过", "2 轻微 / 1 严重", "91.7%"],
+                ["工具参数与重试", "64 条", "60 通过", "4 参数错误", "93.8%"],
+                ["记忆冲突与隔离", "48 条", "43 通过", "5 过期信息", "89.6%"],
+                ["追问、拒答与纠错", "88 条", "81 通过", "7 体验问题", "92.0%"],
+              ].map(([name, count, passed, issue, rate]) => (
+                <div key={name}><span>{name}</span><strong>{count}</strong><small>{passed}</small><em>{issue}</em><b>{rate}</b></div>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel badcase-center section-anchor" id="badcase-center">
+            <div className="panel-header strategy-heading">
+              <div>
+                <span className="module-index">06 / BADCASE OPS</span>
+                <h2>Badcase 分析与修复闭环</h2>
+                <p>发现 → 分类 → 根因定位 → 修复方案 → 回归验证 → 版本发布</p>
+              </div>
+              <div className="badcase-summary"><span>S1 1 条</span><span>S2 2 条</span><span>本周关闭 8 条</span></div>
+            </div>
+            <div className="badcase-layout">
+              <aside className="badcase-list">
+                <div className="badcase-filters"><button className="active">全部 24</button><button>待处理 7</button><button>回归中 4</button></div>
+                {badcaseSeed.map((item, index) => (
+                  <button className={selectedBadcase === index ? "badcase-item selected" : "badcase-item"} onClick={() => setSelectedBadcase(index)} key={item.id}>
+                    <div><span>{item.id}</span><b className={`severity ${item.severity.toLowerCase()}`}>{item.severity}</b></div>
+                    <strong>{item.title}</strong>
+                    <small>{item.scenario} · {item.category}</small>
+                    <em className={`case-status ${badcaseStatuses[item.id]}`}>{badcaseStatuses[item.id]}</em>
+                  </button>
+                ))}
+              </aside>
+              <article className="badcase-detail">
+                <header>
+                  <div><span>{badcaseSeed[selectedBadcase].id} · {badcaseSeed[selectedBadcase].version}</span><h3>{badcaseSeed[selectedBadcase].title}</h3></div>
+                  <div><b className={`severity ${badcaseSeed[selectedBadcase].severity.toLowerCase()}`}>{badcaseSeed[selectedBadcase].severity}</b><em>{badcaseStatuses[badcaseSeed[selectedBadcase].id]}</em></div>
+                </header>
+                <div className="badcase-meta">
+                  <span>场景<strong>{badcaseSeed[selectedBadcase].scenario}</strong></span>
+                  <span>错误分类<strong>{badcaseSeed[selectedBadcase].category}</strong></span>
+                  <span>负责人<strong>{badcaseSeed[selectedBadcase].owner}</strong></span>
+                </div>
+                <div className="answer-compare">
+                  <div className="actual-answer"><span>实际结果</span><p>{badcaseSeed[selectedBadcase].actual}</p></div>
+                  <div className="expected-answer"><span>期望结果</span><p>{badcaseSeed[selectedBadcase].expected}</p></div>
+                </div>
+                <div className="root-cause">
+                  <span>Agent 执行链与根因定位</span>
+                  <div className="cause-chain">
+                    {badcaseSeed[selectedBadcase].rootCause.map((cause, index) => (
+                      <div className={index >= 1 ? "failed" : "passed"} key={cause}><i>{index === 0 ? "✓" : index + 1}</i><strong>{cause}</strong>{index < badcaseSeed[selectedBadcase].rootCause.length - 1 && <b>→</b>}</div>
+                    ))}
+                  </div>
+                </div>
+                <div className="fix-plan"><span>修复方案</span><p>{badcaseSeed[selectedBadcase].fix}</p></div>
+                <div className="badcase-actions">
+                  <button onClick={() => rerunBadcase(badcaseSeed[selectedBadcase].id)}>运行回归测试</button>
+                  <button onClick={() => setNotice("完整 Trace 已复制，可用于算法与工程联合排查")}>复制完整 Trace</button>
+                  <small>关联测试集：库存约束 18 条 · 工具参数 24 条 · 记忆冲突 12 条</small>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section className="panel competitive-lab section-anchor" id="competitive-lab">
+            <div className="panel-header strategy-heading">
+              <div>
+                <span className="module-index">07 / COMPETITIVE LAB</span>
+                <h2>Agent 竞品拆解实验室</h2>
+                <p>统一任务、统一评分规则、匿名竞品名称；结论来自模拟体验测试，不代表竞品官方数据</p>
+              </div>
+              <span className="lab-badge">12 个任务 · 3 个 Agent</span>
+            </div>
+            <div className="competitor-grid">
+              {competitors.map((competitor, index) => {
+                const average = Math.round((competitor.planning + competitor.tools + competitor.memory + competitor.dialogue + competitor.safety) / 5);
+                return (
+                  <button className={`competitor-card ${activeCompetitor === index ? "active" : ""} ${competitor.tone}`} onClick={() => setActiveCompetitor(index)} key={competitor.name}>
+                    <span>{competitor.label}</span><strong>{competitor.name}</strong><div><b>{average}</b><small>综合得分</small></div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="competitive-layout">
+              <article className="score-radar">
+                <header><span>能力雷达 · 当前选择</span><strong>{competitors[activeCompetitor].name}</strong></header>
+                {[
+                  ["规划能力", competitors[activeCompetitor].planning],
+                  ["工具调用", competitors[activeCompetitor].tools],
+                  ["记忆能力", competitors[activeCompetitor].memory],
+                  ["对话体验", competitors[activeCompetitor].dialogue],
+                  ["安全确认", competitors[activeCompetitor].safety],
+                ].map(([name, score]) => (
+                  <div key={name as string}><span>{name}</span><i><b style={{ width: `${score}%` }} /></i><strong>{score}</strong></div>
+                ))}
+              </article>
+              <article className="scenario-matrix">
+                <header><span>统一任务实测</span><small>5 分制 · 双人交叉复核</small></header>
+                <div className="matrix-head"><span>任务</span>{competitors.map((item) => <strong key={item.name}>{item.name}</strong>)}</div>
+                {[
+                  ["复杂预算规划", 4.4, 4.6, 4.1],
+                  ["工具失败自恢复", 4.5, 4.1, 4.7],
+                  ["跨轮约束记忆", 4.6, 4.2, 3.8],
+                  ["高风险操作确认", 4.9, 4.5, 4.3],
+                ].map(([task, ours, a, b]) => (
+                  <div className="matrix-row" key={task as string}><span>{task}</span><strong>{ours}</strong><strong>{a}</strong><strong>{b}</strong></div>
+                ))}
+              </article>
+              <aside className="competitive-insights">
+                <span>机会结论</span>
+                <div><b>01</b><p><strong>保持安全确认优势</strong><small>商智在价格、预算和批量操作确认上领先，适合商家经营场景。</small></p></div>
+                <div><b>02</b><p><strong>补强动态规划</strong><small>行业 Agent A 对中途修改目标的响应更稳定，需要加入 Re-plan 专项集。</small></p></div>
+                <div><b>03</b><p><strong>优化工具失败恢复</strong><small>行业 Agent B 在参数修复和重试上更成熟，应增加 Schema 自校验。</small></p></div>
+              </aside>
+            </div>
+          </section>
+
+          <section className="panel agent-monitoring section-anchor" id="agent-monitoring">
+            <div className="panel-header strategy-heading">
+              <div>
+                <span className="module-index">08 / OBSERVABILITY</span>
+                <h2>Agent 运行监控与 Trace 复盘</h2>
+                <p>模型、工具、成本、延迟、安全与人工确认全链路可观测</p>
+              </div>
+              <select value={monitorWindow} onChange={(event) => setMonitorWindow(event.target.value)} aria-label="监控时间范围">
+                <option>24 小时</option><option>7 天</option><option>30 天</option>
+              </select>
+            </div>
+            <div className="monitor-kpis">
+              {monitorMetrics.map(([label, value, delta, tone]) => (
+                <article key={label}><span>{label}</span><strong><MotionNumber value={value} /></strong><small className={tone}>{delta}</small></article>
+              ))}
+            </div>
+            <div className="monitor-layout">
+              <article className="latency-panel">
+                <header><div><span>调用量与 P95 延迟</span><small>{monitorWindow} · 每 2 小时</small></div><b><i /> 调用量 <i /> P95 延迟</b></header>
+                <div className="monitor-chart">
+                  {[38, 52, 47, 64, 72, 68, 81, 74, 89, 78, 61, 45].map((height, index) => <i key={index} style={{ height: `${height}%` }}><span>{index * 2}:00</span></i>)}
+                  <svg viewBox="0 0 600 130" preserveAspectRatio="none" aria-label="P95延迟趋势">
+                    <polyline points="0,72 54,64 109,77 163,51 218,58 272,42 327,49 381,31 436,38 490,25 545,45 600,52" />
+                  </svg>
+                </div>
+              </article>
+              <article className="tool-health">
+                <header><span>工具健康度</span><small>近 24 小时</small></header>
+                {[
+                  ["get_metric_snapshot", "99.4%", "1.2s", 99],
+                  ["get_review_topics", "97.8%", "1.8s", 98],
+                  ["create_campaign", "94.2%", "2.6s", 94],
+                  ["reply_reviews", "91.7%", "2.1s", 92],
+                  ["adjust_ad_budget", "98.1%", "1.5s", 98],
+                ].map(([tool, success, latency, width]) => (
+                  <div key={tool as string}><span>{tool}</span><i><b style={{ width: `${width}%` }} /></i><strong>{success}</strong><small>{latency}</small></div>
+                ))}
+              </article>
+              <aside className="monitor-feed">
+                <header><span>实时异常与 Trace</span><b>3 条待处理</b></header>
+                {[
+                  ["15:41:28", "tool_retry", "reply_reviews 参数校验失败，重试后成功", "warn"],
+                  ["15:38:06", "guardrail_block", "预算翻倍请求已拦截并要求确认", "safe"],
+                  ["15:32:17", "memory_conflict", "检测到本轮预算与历史记忆冲突", "warn"],
+                  ["15:26:49", "fallback", "模型超时，本轮降级至离线规则引擎", "error"],
+                ].map(([time, event, detail, level]) => (
+                  <div className={level} key={`${time}-${event}`}><i /><p><span>{time} · {event}</span><strong>{detail}</strong></p><button onClick={() => setNotice(`已打开 ${event} 完整 Trace`)}>查看</button></div>
+                ))}
+              </aside>
+            </div>
+          </section>
+
           <section className="panel annotation-workbench section-anchor" id="annotation-workbench">
-            <div className="panel-header strategy-heading"><div><span className="module-index">05 / HUMAN EVALUATION</span><h2>模型标注工作台</h2><p>CASE-{String(annotationIndex+86).padStart(4,"0")} · 150 条模拟评测集 · 当前进度 {annotationIndex+1}/150</p></div><div className="annotator"><span>标注员</span><strong>Reviewer 02</strong></div></div>
+            <div className="panel-header strategy-heading"><div><span className="module-index">09 / HUMAN EVALUATION</span><h2>模型标注工作台</h2><p>CASE-{String(annotationIndex+86).padStart(4,"0")} · 150 条模拟评测集 · 当前进度 {annotationIndex+1}/150</p></div><div className="annotator"><span>标注员</span><strong>Reviewer 02</strong></div></div>
             <div className="annotation-layout">
               <div className="case-context"><header><span>商家案例</span><b>零售 · 库存积压 · 高风险</b></header><dl><div><dt>经营事实</dt><dd>即饮咖啡库存周转天数由 21 天升至 46 天，近 14 日销量下降 32%，毛利率 18%。</dd></div><div><dt>约束条件</dt><dd>商家最低可接受毛利率为 12%；价格或预算调整必须二次确认。</dd></div></dl><div className="model-answer"><span>模型回答 · Prompt v2.5-rc1</span><p>建议将即饮咖啡统一降价30%并立即上线清仓活动，预计7天内清理80%库存。</p></div><div className="evidence-alert"><span>!</span><p><strong>自动风险提示</strong>：建议价格会使毛利率低于商家约束，且包含未经依据验证的效果承诺。</p></div></div>
               <div className="score-form"><header><span>八维评分</span><small>1 = 严重不符合 · 5 = 完全符合</small></header>{["问题判断准确","数据引用正确","建议可执行","符合行业特点","无虚构数据","语气适合商家","无违规承诺","高风险操作确认"].map((name,i)=><div className="score-row-form" key={name}><span>{name}</span><div>{[1,2,3,4,5].map(score=><button className={scores[i]===score?"active":""} onClick={()=>setScores(current=>current.map((v,idx)=>idx===i?score:v))} key={score}>{score}</button>)}</div></div>)}</div>
@@ -783,7 +1142,7 @@ export default function Home() {
           </section>
 
           <section className="portfolio-panel section-anchor" id="portfolio-assets">
-            <div><span className="module-index">06 / DELIVERABLES</span><h2>求职作品集资料包</h2><p>从需求研究到评测数据，所有材料均可下载复盘。模拟数据已在文件中明确标注。</p></div>
+            <div><span className="module-index">10 / DELIVERABLES</span><h2>求职作品集资料包</h2><p>从需求研究到评测数据，所有材料均可下载复盘。模拟数据已在文件中明确标注。</p></div>
             <div className="asset-grid"><a href="/assets/shangzhi-prd.docx" download><span>DOCX</span><strong>完整PRD</strong><small>背景、流程、需求、埋点、风险</small></a><a href="/assets/shangzhi-portfolio.pptx" download><span>PPTX</span><strong>面试汇报PPT</strong><small>12页完整项目故事线</small></a><a href="/assets/shangzhi-evaluation-dataset.xlsx" download><span>XLSX</span><strong>150条评测数据集</strong><small>案例、回答、八维评分与标签</small></a></div>
           </section>
         </section>
