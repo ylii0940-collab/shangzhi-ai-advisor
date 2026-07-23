@@ -1,8 +1,54 @@
 "use client";
 
-import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 
-type Message = { role: "assistant" | "merchant"; text: string };
+type AgentMode = "connecting" | "live" | "demo" | "fallback";
+
+type AgentEvidence = {
+  evidence_id: string;
+  metric: string;
+  observed: string;
+  comparison: string;
+  source: string;
+};
+
+type AgentRecommendation = {
+  title: string;
+  rationale: string;
+  steps: string[];
+  expected_signal: string;
+  action_type: string;
+  risk_level: "low" | "medium" | "high";
+  requires_confirmation: boolean;
+};
+
+type AgentAction = {
+  action_id: string;
+  title: string;
+  action_type: string;
+  status: "pending" | "approved" | "rejected" | "executed";
+  risk_level: "low" | "medium" | "high";
+};
+
+type AgentResult = {
+  thread_id: string;
+  mode: Exclude<AgentMode, "connecting">;
+  model: string;
+  answer: string;
+  evidence: AgentEvidence[];
+  recommendations: AgentRecommendation[];
+  actions: AgentAction[];
+  confidence: number;
+  missing_data: string[];
+  safety: {
+    level: "low" | "medium" | "high";
+    requires_confirmation: boolean;
+    warnings: string[];
+  };
+};
+
+type AgentStep = { node: string; label: string; status: string };
+type Message = { role: "assistant" | "merchant"; text: string; agent?: AgentResult };
 
 const navItems = ["经营总览", "调研策略", "策略看板", "A/B 实验", "实验配置", "标注工作台", "作品集资料"];
 
@@ -121,21 +167,21 @@ export default function Home() {
   const [scores, setScores] = useState([4, 5, 4, 4, 5, 4, 5, 5]);
   const [severeErrors, setSevereErrors] = useState<string[]>([]);
   const [isThinking, setIsThinking] = useState(false);
+  const [agentMode, setAgentMode] = useState<AgentMode>("connecting");
+  const [agentTrace, setAgentTrace] = useState<AgentStep[]>([]);
+  const [agentError, setAgentError] = useState("");
+  const [threadId, setThreadId] = useState("");
+  const [actionStates, setActionStates] = useState<Record<string, "approved" | "rejected">>({});
   const [currentTime, setCurrentTime] = useState(new Date());
   const [liveTick, setLiveTick] = useState(0);
   const [reportExpanded, setReportExpanded] = useState(false);
   const [tasksDone, setTasksDone] = useState([true, true, false, false]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const response = useMemo(
-    () =>
-      "建议先做一个 7 天小流量实验：保留 ¥168 原价，新增工作日晚市 ¥148 限时价，并将套餐中的小食升级为双份。预计可提升转化率 8%–12%。我可以先为你生成活动方案，确认后再创建。",
-    [],
-  );
-
   useEffect(() => {
     const clock = window.setInterval(() => setCurrentTime(new Date()), 1000);
     const pulse = window.setInterval(() => setLiveTick((tick) => tick + 1), 2600);
+    setThreadId(window.localStorage.getItem("shangzhi_thread_id") ?? "");
     return () => {
       window.clearInterval(clock);
       window.clearInterval(pulse);
@@ -184,16 +230,90 @@ export default function Home() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages, isThinking]);
 
-  function sendMessage(text?: string) {
+  async function sendMessage(text?: string) {
     const content = (text ?? input).trim();
     if (!content || isThinking) return;
     setMessages((current) => [...current, { role: "merchant", text: content }]);
     setInput("");
     setIsThinking(true);
-    window.setTimeout(() => {
-      setMessages((current) => [...current, { role: "assistant", text: response }]);
+    setAgentError("");
+    setAgentTrace([]);
+
+    try {
+      const request = await fetch("/api/agent/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: content,
+          thread_id: threadId || null,
+          merchant_id: "merchant_demo",
+        }),
+      });
+      if (!request.ok || !request.body) {
+        throw new Error("Agent 服务暂时不可用");
+      }
+
+      const reader = request.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let receivedFinal = false;
+
+      const handleEvent = (block: string) => {
+        const raw = block
+          .split("\n")
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trim())
+          .join("\n");
+        if (!raw) return;
+        const event = JSON.parse(raw);
+        if (event.type === "start") {
+          const nextThreadId = String(event.thread_id ?? "");
+          if (nextThreadId) {
+            setThreadId(nextThreadId);
+            window.localStorage.setItem("shangzhi_thread_id", nextThreadId);
+          }
+          if (["live", "demo", "fallback"].includes(event.mode)) {
+            setAgentMode(event.mode);
+          }
+        } else if (event.type === "step") {
+          setAgentTrace((current) => [
+            ...current.filter((step) => step.node !== event.node),
+            { node: event.node, label: event.label, status: event.status },
+          ]);
+        } else if (event.type === "final") {
+          const result = event.data as AgentResult;
+          receivedFinal = true;
+          setAgentMode(result.mode);
+          setMessages((current) => [
+            ...current,
+            { role: "assistant", text: result.answer, agent: result },
+          ]);
+        } else if (event.type === "error") {
+          throw new Error(event.error || "Agent 运行失败");
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+        const blocks = buffer.split("\n\n");
+        buffer = blocks.pop() ?? "";
+        blocks.filter(Boolean).forEach(handleEvent);
+        if (done) break;
+      }
+      if (buffer.trim()) handleEvent(buffer);
+      if (!receivedFinal) throw new Error("Agent 未返回完整结果");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Agent 请求失败";
+      setAgentError(message);
+      setAgentMode("fallback");
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", text: `抱歉，本轮分析没有完成：${message}。请稍后重试。` },
+      ]);
+    } finally {
       setIsThinking(false);
-    }, 850);
+    }
   }
 
   function submit(event: FormEvent) {
@@ -206,6 +326,26 @@ export default function Home() {
     setTasksDone((current) => current.map((done, index) => index === 2 ? true : done));
     setNotice("优化任务已加入今日待办");
     window.setTimeout(() => setNotice(""), 2600);
+  }
+
+  async function confirmAgentAction(actionId: string, approved: boolean) {
+    try {
+      const response = await fetch("/api/agent/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action_id: actionId, approved }),
+      });
+      if (!response.ok) throw new Error("确认操作失败");
+      setActionStates((current) => ({
+        ...current,
+        [actionId]: approved ? "approved" : "rejected",
+      }));
+      setNotice(approved ? "已确认执行，操作结果已写入审计记录" : "已拒绝，本次不会执行任何变更");
+      window.setTimeout(() => setNotice(""), 2600);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "确认操作失败");
+      window.setTimeout(() => setNotice(""), 2600);
+    }
   }
 
   function toggleTask(index: number) {
@@ -371,17 +511,92 @@ export default function Home() {
             <section className="ai-panel">
               <div className="ai-header">
                 <div className="ai-avatar">✦</div>
-                <div><h2>AI 经营顾问</h2><p><span /> 正在为你分析经营数据</p></div>
+                <div>
+                  <h2>AI 经营顾问</h2>
+                  <p className={`agent-status ${agentMode}`}>
+                    <span />
+                    {agentMode === "live" && "LIVE · LangChain + LangGraph"}
+                    {agentMode === "demo" && "DEMO · 离线可审计推理"}
+                    {agentMode === "fallback" && "FALLBACK · 服务已降级"}
+                    {agentMode === "connecting" && "正在连接 Agent 服务"}
+                  </p>
+                </div>
                 <button aria-label="更多选项">•••</button>
               </div>
               <div className="chat-log">
                 {messages.map((message, index) => (
                   <div className={`message ${message.role}`} key={`${message.role}-${index}`}>
                     {message.role === "assistant" && <div className="tiny-avatar">✦</div>}
-                    <p>{message.text}</p>
+                    <div className="message-content">
+                      <p className="message-bubble">{message.text}</p>
+                      {message.agent && (
+                        <section className="agent-result">
+                          <header>
+                            <span className={`result-mode ${message.agent.mode}`}>{message.agent.mode.toUpperCase()}</span>
+                            <b>置信度 {Math.round(message.agent.confidence * 100)}%</b>
+                          </header>
+                          <details open>
+                            <summary>证据链 · {message.agent.evidence.length} 条</summary>
+                            <div className="agent-evidence">
+                              {message.agent.evidence.map((evidence) => (
+                                <article key={evidence.evidence_id}>
+                                  <span>{evidence.evidence_id} · {evidence.metric}</span>
+                                  <strong>{evidence.observed}</strong>
+                                  <small>{evidence.comparison}</small>
+                                  <em>{evidence.source}</em>
+                                </article>
+                              ))}
+                            </div>
+                          </details>
+                          <details open>
+                            <summary>行动建议 · {message.agent.recommendations.length} 条</summary>
+                            <div className="agent-recommendations">
+                              {message.agent.recommendations.map((recommendation) => (
+                                <article key={recommendation.title}>
+                                  <div>
+                                    <strong>{recommendation.title}</strong>
+                                    <span className={`risk ${recommendation.risk_level}`}>{recommendation.risk_level}</span>
+                                  </div>
+                                  <p>{recommendation.rationale}</p>
+                                  <ol>{recommendation.steps.map((step) => <li key={step}>{step}</li>)}</ol>
+                                  <small>验证指标：{recommendation.expected_signal}</small>
+                                </article>
+                              ))}
+                            </div>
+                          </details>
+                          {message.agent.actions.map((action) => {
+                            const status = actionStates[action.action_id];
+                            return (
+                              <div className={`agent-confirm ${status ?? ""}`} key={action.action_id}>
+                                {status ? (
+                                  <strong>{status === "approved" ? "✓ 已确认并记录执行" : "✕ 已拒绝，未执行"}</strong>
+                                ) : (
+                                  <>
+                                    <p>高风险操作：{action.title}</p>
+                                    <div>
+                                      <button onClick={() => confirmAgentAction(action.action_id, true)}>确认执行</button>
+                                      <button onClick={() => confirmAgentAction(action.action_id, false)}>暂不执行</button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {message.agent.missing_data.length > 0 && (
+                            <p className="missing-data">仍需补充：{message.agent.missing_data.join("、")}</p>
+                          )}
+                        </section>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {isThinking && <div className="message assistant thinking"><div className="tiny-avatar">✦</div><p><i /><i /><i /></p></div>}
+                {agentTrace.length > 0 && (
+                  <div className="agent-trace" aria-label="Agent执行轨迹">
+                    {agentTrace.map((step) => <span key={step.node}>✓ {step.label}</span>)}
+                  </div>
+                )}
+                {agentError && <p className="agent-error">{agentError}</p>}
                 {messages.length === 1 && (
                   <div className="recommendation">
                     <strong>建议优先处理</strong>

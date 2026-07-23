@@ -1,17 +1,49 @@
-# vinext-starter
+# 商智 AI 经营顾问
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+面向本地生活商家的完整 AI 产品经理作品集。公开前端包含经营总览、调研策略、
+完整转化漏斗、A/B 实验、Prompt 版本、模型评测与人工标注工作台；Python
+后端位于 `python_shangzhi/`，使用 FastAPI、LangChain、LangGraph、OpenAI
+Responses API、SQLite 记忆和人工确认门。
 
 ## Prerequisites
 
 - Node.js `>=22.13.0`
 
-## Quick Start
+## 启动完整前后端
+
+macOS 可直接双击根目录的 `启动完整项目.command`，它会安装缺少的依赖、
+同时启动完整前端和 Python Agent，并打开 `http://127.0.0.1:3000`。
+需要启用真实模型时，先双击 `配置大模型.command` 写入后端密钥。
+
+也可以分别手动启动：
 
 ```bash
 npm install
+npm run dev
+```
+
+另开终端启动 Python Agent：
+
+```bash
+cd python_shangzhi
+./启动商智.command
+```
+
+在前端根目录创建本地 `.env.local`：
+
+```dotenv
+AGENT_API_URL=http://127.0.0.1:8000
+```
+
+然后访问 `http://localhost:3000`。浏览器只请求同源 `/api/agent/*`，Vinext
+服务端再转发给 Python，因此 OpenAI Key 不会进入前端。
+
+如果没有配置 `AGENT_API_URL`，完整页面仍会以明确标识的 `DEMO` 模式运行；
+如果 Python 服务暂时不可用，会显示 `FALLBACK`，不会伪装成真实模型。
+
+## 构建
+
+```bash
 npm run dev
 npm run build
 ```

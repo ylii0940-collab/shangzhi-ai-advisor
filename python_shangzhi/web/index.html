@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>商智 · Python AI 经营顾问</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="pointer-glow"></div>
+  <aside class="sidebar">
+    <div class="brand"><b>商</b><div><strong>商智</strong><span>PYTHON AI ADVISOR</span></div></div>
+    <nav>
+      <button data-target="overview" class="active">⌂　经营总览</button>
+      <button data-target="agent-lab">✦　Agent 架构</button>
+      <button data-target="research">◎　行业策略</button>
+      <button data-target="funnel">▥　策略漏斗</button>
+      <button data-target="experiment">⚗　A/B 实验</button>
+      <button data-target="annotation">✓　标注工作台</button>
+    </nav>
+    <div class="merchant"><i>李</i><div><b>李记小馆</b><small>餐饮 · 杭州湖滨店</small></div></div>
+  </aside>
+
+  <main>
+    <header>
+      <div><p id="clock">正在同步时间…</p><h1>早上好，李店长</h1></div>
+      <div id="systemStatus" class="live"><i></i> 正在连接 AGENT…</div>
+    </header>
+
+    <section id="overview" class="section reveal">
+      <article class="hero glass">
+        <div><span class="pill">● 门店经营健康</span><p>今日经营评分</p><h2><b data-count="82">0</b><small>/ 100</small></h2><h3>超过同商圈 73% 的餐饮门店</h3><button class="ask" data-question="生成今日经营简报">✦ 生成经营简报</button></div>
+        <div class="orbit"><div><b data-count="82">0</b><span>良好</span></div></div>
+      </article>
+      <div id="metricGrid" class="metrics"></div>
+      <article class="glass opportunities"><div class="title"><div><h2>AI 发现的经营机会</h2><p>模拟经营数据 · 点击即可询问 AI</p></div></div><div id="opportunityList"></div></article>
+    </section>
+
+    <section class="grid section reveal">
+      <article class="glass chat">
+        <div class="title"><div><h2>✦ AI 经营顾问</h2><p>LangGraph 工作流 · 工具调用 · 证据链 · 人工确认</p></div><span id="agentModeBadge">连接中</span></div>
+        <div id="agentTrace" class="agent-trace" aria-live="polite"></div>
+        <div id="messages" class="messages"><div class="assistant">正在读取 Agent 配置。你可以询问套餐转化、差评、预算、活动或库存问题。</div></div>
+        <div class="chips"><button data-question="为什么本周转化率下降？">为什么转化下降？</button><button data-question="帮我优化双人套餐">优化双人套餐</button><button data-question="总结最近的差评">总结差评</button></div>
+        <form id="chatForm"><input id="chatInput" maxlength="1200" placeholder="问问今日经营情况…" required><button id="chatSubmit" aria-label="发送">↑</button></form>
+      </article>
+      <article class="glass tasks"><div class="title"><div><h2>今日待办</h2><p><b id="taskCount">2</b> / 4 项已完成</p></div></div><div class="progress"><i id="taskProgress"></i></div>
+        <label><input type="checkbox" checked>回复 3 条最新评价</label>
+        <label><input type="checkbox" checked>确认周末推广预算</label>
+        <label><input type="checkbox">优化招牌双人餐</label>
+        <label><input type="checkbox">补充 2 张门店环境图</label>
+      </article>
+    </section>
+
+    <section id="agent-lab" class="glass section reveal agent-lab">
+      <div class="title">
+        <div><span class="module">00 / AGENT SYSTEM</span><h2>真实 Agent 运行架构</h2><p>每次回答都经过数据工具、结构化诊断、风险审核与持久化</p></div>
+        <button id="runEval" class="eval-button">运行内置评测</button>
+      </div>
+      <div class="agent-flow">
+        <article><span>01</span><b>经营数据检索</b><small>LangChain Tools</small></article>
+        <i>→</i>
+        <article><span>02</span><b>结构化诊断</b><small>OpenAI + JSON Schema</small></article>
+        <i>→</i>
+        <article><span>03</span><b>证据风险审核</b><small>Deterministic Guardrails</small></article>
+        <i>→</i>
+        <article><span>04</span><b>记忆与确认</b><small>SQLite + Human Gate</small></article>
+      </div>
+      <div class="agent-runtime">
+        <article><span>当前模式</span><b id="runtimeMode">检测中</b><small>LIVE / DEMO / FALLBACK</small></article>
+        <article><span>模型</span><b id="runtimeModel">检测中</b><small>服务器环境变量控制</small></article>
+        <article><span>持久记忆</span><b id="runtimeMemory">SQLite</b><small>对话、行动、Trace</small></article>
+        <article><span>评测通过率</span><b id="evalRate">尚未运行</b><small id="evalDetail">点击右上角运行</small></article>
+      </div>
+      <div class="security-note"><b>密钥隔离</b><span>OPENAI_API_KEY 只由 Python 后端读取，浏览器永远拿不到密钥；所有价格、预算、发券、活动和批量回复操作默认停在人工确认门。</span></div>
+    </section>
+
+    <section id="research" class="glass section reveal">
+      <div class="title"><div><span class="module">01 / DISCOVERY</span><h2>商家调研与行业策略</h2><p>模拟访谈用于演示研究方法</p></div><div class="tabs"><button class="active" data-industry="餐饮">餐饮</button><button data-industry="零售">零售</button><button data-industry="休闲娱乐">休闲娱乐</button></div></div>
+      <div class="research"><div class="persona"><i id="personaIcon">餐</i><div><span>核心用户画像</span><h3 id="personaName">李店长 · 单店经营者</h3><p id="personaText">每天只能抽出 20 分钟看数据，希望系统直接告诉他先做什么。</p></div></div><div id="insights" class="insights"></div></div>
+    </section>
+
+    <section id="funnel" class="glass section reveal">
+      <div class="title"><div><span class="module">02 / CONVERSION</span><h2>商家沟通转化漏斗</h2><p>消息送达 → 阅读 → 回复 → 采纳 → 执行 → 改善</p></div></div>
+      <div id="funnelRows" class="funnel"></div>
+    </section>
+
+    <section id="experiment" class="glass section reveal">
+      <div class="title"><div><span class="module">03 / EXPERIMENT</span><h2>A/B 实验实时测算</h2><p>拖动 B 组流量，Python 会重新计算样本与周期</p></div><span class="running">● 运行中</span></div>
+      <div class="variants"><article><b>A 组 · 对照</b><blockquote>“您最近的经营数据存在异常，点击查看详情。”</blockquote><strong>回复率 30.8%</strong></article><article class="winner"><b>B 组 · 实验</b><blockquote>“套餐曝光上涨12%，但每天少成交约8单，可能与近期差评有关。我整理了3条建议。”</blockquote><strong>回复率 39.0%　+8.2pp</strong></article></div>
+      <div class="calculator"><div id="trafficRing" class="traffic-ring"><b id="trafficValue">50%</b><small>B 组流量</small></div><input id="traffic" type="range" min="10" max="90" value="50"><div class="calc-result"><p>A / B 样本 <b id="samples">24,000 / 24,000</b></p><p>预计周期 <b id="days">14 天</b></p><p>统计功效 <b id="power">92%</b></p></div></div>
+    </section>
+
+    <section id="annotation" class="glass section reveal">
+      <div class="title"><div><span class="module">04 / HUMAN EVALUATION</span><h2>模型标注工作台</h2><p id="caseTitle">CASE-0086 · 零售库存积压 · 高风险</p></div></div>
+      <div class="annotation">
+        <article class="case"><h3>经营事实</h3><p>库存周转天数由 21 天升至 46 天，近 14 日销量下降 32%，毛利率 18%；商家最低可接受毛利率为 12%。</p><h3>模型回答</h3><p>建议统一降价 30% 并立即上线清仓活动，预计 7 天内清理 80% 库存。</p><em>⚠ 可能突破毛利约束并包含未经验证的效果承诺。</em></article>
+        <form id="annotationForm"><div id="scoreRows"></div><fieldset><legend>严重错误标签</legend><label><input name="error" type="checkbox" value="违反商家约束">违反商家约束</label><label><input name="error" type="checkbox" value="虚构效果承诺">虚构效果承诺</label><label><input name="error" type="checkbox" value="未要求二次确认">未要求二次确认</label></fieldset><textarea id="note">建议改为分层折扣实验，并先测算毛利率约束下的最大折扣。</textarea><div class="submit"><span>综合得分 <b id="totalScore">4.50</b></span><button>保存标注并进入下一条 →</button></div></form>
+      </div>
+    </section>
+
+    <footer>商智 AI 商家经营顾问 · Python + LangChain + LangGraph · 所有经营数据均为模拟数据</footer>
+  </main>
+  <div id="toast"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
