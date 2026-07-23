@@ -374,7 +374,7 @@ async function initialize() {
       $("#evalRate").textContent = `${Math.round(evals.summary.pass_rate * 100)}%`;
       $("#evalDetail").textContent = `${evals.summary.passed} / ${evals.summary.total} 条历史评测通过`;
     }
-  } catch (_) {
+  } catch {
     // 首次运行没有评测记录时保持默认文案。
   }
 }

@@ -24,8 +24,12 @@ class AgentProductAnalyticsTests(unittest.TestCase):
         self.assertEqual(result["passed"], result["total"])
         self.assertTrue(result["suite"])
 
-    def test_competitor_and_observability_reports_have_product_metrics(self) -> None:
+    def test_version_benchmark_and_observability_have_product_metrics(self) -> None:
         self.assertEqual(len(COMPETITOR_REPORT["agents"]), 3)
+        self.assertEqual(
+            {item["name"] for item in COMPETITOR_REPORT["agents"]},
+            {"商智 v2.5", "商智 v2.4", "无工具基线"},
+        )
         self.assertGreater(OBSERVABILITY_REPORT["calls"], 0)
         self.assertEqual(OBSERVABILITY_REPORT["confirmation_coverage"], 1.0)
 

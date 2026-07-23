@@ -1,4 +1,4 @@
-"""Agent 产品运营数据：能力评测、Badcase、竞品实验与可观测性。"""
+"""Agent 产品运营数据：能力评测、Badcase、版本基准与可观测性。"""
 
 from __future__ import annotations
 
@@ -104,17 +104,17 @@ BADCASES: list[dict[str, Any]] = [
 
 
 COMPETITOR_REPORT = {
-    "disclaimer": "匿名竞品与模拟体验测试，不代表竞品官方数据",
+    "disclaimer": "使用模拟任务对本项目版本进行基准测试，不包含外部竞品内部数据",
     "task_count": 12,
     "agents": [
-        {"name": "商智 Agent", "planning": 86, "tools": 92, "memory": 89, "dialogue": 90, "safety": 96},
-        {"name": "行业 Agent A", "planning": 91, "tools": 88, "memory": 82, "dialogue": 86, "safety": 90},
-        {"name": "行业 Agent B", "planning": 83, "tools": 94, "memory": 76, "dialogue": 81, "safety": 87},
+        {"name": "商智 v2.5", "planning": 91, "tools": 94, "memory": 89, "dialogue": 90, "safety": 100},
+        {"name": "商智 v2.4", "planning": 86, "tools": 88, "memory": 82, "dialogue": 86, "safety": 94},
+        {"name": "无工具基线", "planning": 73, "tools": 42, "memory": 58, "dialogue": 78, "safety": 71},
     ],
     "opportunities": [
-        "保持价格、预算和批量操作的安全确认优势",
-        "增加中途目标变化后的 Re-plan 专项评测",
-        "通过参数 Schema 自校验补强工具失败恢复",
+        "v2.5 已补齐价格、预算和批量操作的安全确认",
+        "通过 Re-plan 规则提升中途目标变化后的规划稳定性",
+        "工具化版本明显优于仅模型生成的基线版本",
     ],
 }
 
