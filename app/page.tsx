@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Message = { role: "assistant" | "merchant"; text: string };
 
@@ -75,6 +75,35 @@ function Sparkline() {
   );
 }
 
+function MotionNumber({ value }: { value: string }) {
+  const match = value.match(/-?[\d,.]+/);
+  const target = match ? Number(match[0].replaceAll(",", "")) : 0;
+  const decimals = match?.[0].includes(".") ? match[0].split(".")[1].length : 0;
+  const prefix = match ? value.slice(0, match.index) : "";
+  const suffix = match ? value.slice((match.index ?? 0) + match[0].length) : value;
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    let frame = 0;
+    const started = performance.now();
+    const duration = 900;
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - started) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(target * eased);
+      if (progress < 1) frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
+
+  const formatted = display.toLocaleString("zh-CN", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return <>{prefix}{formatted}{suffix}</>;
+}
+
 export default function Home() {
   const [activeNav, setActiveNav] = useState("经营总览");
   const [messages, setMessages] = useState<Message[]>([
@@ -90,7 +119,13 @@ export default function Home() {
   const [traffic, setTraffic] = useState(50);
   const [annotationIndex, setAnnotationIndex] = useState(0);
   const [scores, setScores] = useState([4, 5, 4, 4, 5, 4, 5, 5]);
-  const [severeError, setSevereError] = useState(false);
+  const [severeErrors, setSevereErrors] = useState<string[]>([]);
+  const [isThinking, setIsThinking] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [liveTick, setLiveTick] = useState(0);
+  const [reportExpanded, setReportExpanded] = useState(false);
+  const [tasksDone, setTasksDone] = useState([true, true, false, false]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const response = useMemo(
     () =>
@@ -98,15 +133,67 @@ export default function Home() {
     [],
   );
 
+  useEffect(() => {
+    const clock = window.setInterval(() => setCurrentTime(new Date()), 1000);
+    const pulse = window.setInterval(() => setLiveTick((tick) => tick + 1), 2600);
+    return () => {
+      window.clearInterval(clock);
+      window.clearInterval(pulse);
+    };
+  }, []);
+
+  useEffect(() => {
+    const revealObserver = new IntersectionObserver(
+      (entries) => entries.forEach((entry) => entry.isIntersecting && entry.target.classList.add("is-visible")),
+      { threshold: 0.08 },
+    );
+    document.querySelectorAll(".section-anchor,.panel,.metric-card").forEach((element) => {
+      element.classList.add("reveal-on-scroll");
+      revealObserver.observe(element);
+    });
+
+    const navMap: Record<string, string> = {
+      overview: "经营总览",
+      "research-strategy": "调研策略",
+      "strategy-dashboard": "策略看板",
+      "ab-experiment": "A/B 实验",
+      "experiment-builder": "实验配置",
+      "annotation-workbench": "标注工作台",
+      "portfolio-assets": "作品集资料",
+    };
+    const navObserver = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target.id && navMap[visible.target.id]) setActiveNav(navMap[visible.target.id]);
+      },
+      { threshold: [0.2, 0.45], rootMargin: "-10% 0px -45% 0px" },
+    );
+    Object.keys(navMap).forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) navObserver.observe(element);
+    });
+    return () => {
+      revealObserver.disconnect();
+      navObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [messages, isThinking]);
+
   function sendMessage(text?: string) {
     const content = (text ?? input).trim();
-    if (!content) return;
-    setMessages((current) => [
-      ...current,
-      { role: "merchant", text: content },
-      { role: "assistant", text: response },
-    ]);
+    if (!content || isThinking) return;
+    setMessages((current) => [...current, { role: "merchant", text: content }]);
     setInput("");
+    setIsThinking(true);
+    window.setTimeout(() => {
+      setMessages((current) => [...current, { role: "assistant", text: response }]);
+      setIsThinking(false);
+    }, 850);
   }
 
   function submit(event: FormEvent) {
@@ -116,9 +203,26 @@ export default function Home() {
 
   function createTask() {
     setTaskCreated(true);
+    setTasksDone((current) => current.map((done, index) => index === 2 ? true : done));
     setNotice("优化任务已加入今日待办");
     window.setTimeout(() => setNotice(""), 2600);
   }
+
+  function toggleTask(index: number) {
+    setTasksDone((current) => current.map((done, taskIndex) => taskIndex === index ? !done : done));
+    setNotice("待办状态已更新");
+    window.setTimeout(() => setNotice(""), 1800);
+  }
+
+  function toggleSevereError(label: string) {
+    setSevereErrors((current) => current.includes(label) ? current.filter((item) => item !== label) : [...current, label]);
+  }
+
+  const totalSamples = 48000;
+  const bSamples = Math.round(totalSamples * traffic / 100);
+  const aSamples = totalSamples - bSamples;
+  const estimatedDays = Math.max(7, Math.round(14 * 50 / Math.min(traffic, 100 - traffic)));
+  const completedCount = tasksDone.filter(Boolean).length;
 
   function navigateTo(item: string) {
     setActiveNav(item);
@@ -135,7 +239,16 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
+    <main
+      className="app-shell"
+      onPointerMove={(event) => {
+        event.currentTarget.style.setProperty("--pointer-x", `${event.clientX}px`);
+        event.currentTarget.style.setProperty("--pointer-y", `${event.clientY}px`);
+      }}
+    >
+      <div className="ambient-motion" aria-hidden="true">
+        <i /><i /><i /><i /><i /><i />
+      </div>
       {notice && <div className="toast">✓ {notice}</div>}
 
       <aside className="sidebar">
@@ -172,12 +285,16 @@ export default function Home() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">2026年7月23日 · 星期四</p>
+            <p className="eyebrow">
+              {currentTime.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
+              <span className="live-clock">{currentTime.toLocaleTimeString("zh-CN", { hour12: false })}</span>
+            </p>
             <h1>早上好，李店长</h1>
           </div>
           <div className="top-actions">
-            <button className="icon-button" aria-label="搜索">⌕</button>
-            <button className="icon-button has-dot" aria-label="通知">♢</button>
+            <div className="live-data"><i /> LIVE · 第 {liveTick + 1} 次刷新</div>
+            <button className="icon-button" aria-label="搜索" onClick={() => setNotice("搜索功能已唤起（作品集演示）")}>⌕</button>
+            <button className="icon-button has-dot" aria-label="通知" onClick={() => setNotice("你有 3 条经营机会提醒")}>♢</button>
             <button className="primary-button" onClick={() => sendMessage("生成今日经营简报")}>✦ 询问 AI 顾问</button>
           </div>
         </header>
@@ -188,7 +305,7 @@ export default function Home() {
               <div className="hero-copy">
                 <div className="status-pill"><span /> 门店经营健康</div>
                 <p className="hero-kicker">今日经营评分</p>
-                <div className="score-row"><strong>82</strong><span>/ 100</span><b>↑ 5</b></div>
+                <div className="score-row"><strong><MotionNumber value="82" /></strong><span>/ 100</span><b>↑ 5</b></div>
                 <p className="hero-note">超过同商圈 73% 的餐饮门店，复购表现良好，套餐转化仍有提升空间。</p>
                 <button onClick={() => sendMessage("给我完整解释今日经营评分")}>查看完整诊断 <span>→</span></button>
               </div>
@@ -202,7 +319,7 @@ export default function Home() {
               {metrics.map((metric) => (
                 <article className="metric-card" key={metric.label}>
                   <span>{metric.label}</span>
-                  <div><strong>{metric.value}</strong><b className={metric.positive ? "up" : "down"}>{metric.trend}</b></div>
+                  <div><strong><MotionNumber value={metric.value} /></strong><b className={metric.positive ? "up" : "down"}>{metric.trend}</b></div>
                   <small>较上周同期</small>
                 </article>
               ))}
@@ -238,7 +355,7 @@ export default function Home() {
                 <div className="chart-y"><span>16k</span><span>12k</span><span>8k</span><span>4k</span><span>0</span></div>
                 <div className="chart-area">
                   <div className="grid-lines"><i/><i/><i/><i/><i/></div>
-                  <div className="line-chart" aria-hidden="true">
+                  <div className="line-chart" aria-hidden="true" key={liveTick}>
                     <span style={{left:"0%", bottom:"30%"}}/><span style={{left:"16.6%", bottom:"43%"}}/>
                     <span style={{left:"33.2%", bottom:"38%"}}/><span style={{left:"49.8%", bottom:"61%"}}/>
                     <span style={{left:"66.4%", bottom:"56%"}}/><span style={{left:"83%", bottom:"70%"}}/>
@@ -264,6 +381,7 @@ export default function Home() {
                     <p>{message.text}</p>
                   </div>
                 ))}
+                {isThinking && <div className="message assistant thinking"><div className="tiny-avatar">✦</div><p><i /><i /><i /></p></div>}
                 {messages.length === 1 && (
                   <div className="recommendation">
                     <strong>建议优先处理</strong>
@@ -271,6 +389,7 @@ export default function Home() {
                     <div><button onClick={createTask}>{taskCreated ? "✓ 已加入待办" : "生成优化方案"}</button><button onClick={() => sendMessage("告诉我你的分析依据")}>查看分析依据</button></div>
                   </div>
                 )}
+                <div ref={chatEndRef} />
               </div>
               <div className="quick-prompts">
                 {quickPrompts.map((prompt) => <button key={prompt} onClick={() => sendMessage(prompt)}>{prompt}</button>)}
@@ -283,12 +402,12 @@ export default function Home() {
             </section>
 
             <section className="panel tasks">
-              <div className="panel-header"><div><h2>今日待办</h2><p>完成 2 / 4 项</p></div><button>全部任务</button></div>
-              <div className="progress"><span style={{width: taskCreated ? "75%" : "50%"}} /></div>
-              <label><input type="checkbox" defaultChecked /><span><strong>回复 3 条最新评价</strong><small>已完成 · 09:20</small></span></label>
-              <label><input type="checkbox" defaultChecked /><span><strong>确认周末推广预算</strong><small>已完成 · 10:05</small></span></label>
-              <label><input type="checkbox" checked={taskCreated} onChange={createTask} /><span><strong>优化招牌双人餐</strong><small>建议今天 17:00 前完成</small></span></label>
-              <label><input type="checkbox" /><span><strong>补充 2 张门店环境图</strong><small>预计提升详情页点击率</small></span></label>
+              <div className="panel-header"><div><h2>今日待办</h2><p>完成 {completedCount} / 4 项</p></div><button onClick={() => setNotice("已展示今日全部任务")}>全部任务</button></div>
+              <div className="progress"><span style={{width: `${completedCount / 4 * 100}%`}} /></div>
+              <label><input type="checkbox" checked={tasksDone[0]} onChange={() => toggleTask(0)} /><span><strong>回复 3 条最新评价</strong><small>已完成 · 09:20</small></span></label>
+              <label><input type="checkbox" checked={tasksDone[1]} onChange={() => toggleTask(1)} /><span><strong>确认周末推广预算</strong><small>已完成 · 10:05</small></span></label>
+              <label><input type="checkbox" checked={tasksDone[2]} onChange={() => toggleTask(2)} /><span><strong>优化招牌双人餐</strong><small>建议今天 17:00 前完成</small></span></label>
+              <label><input type="checkbox" checked={tasksDone[3]} onChange={() => toggleTask(3)} /><span><strong>补充 2 张门店环境图</strong><small>预计提升详情页点击率</small></span></label>
             </section>
           </aside>
         </div>
@@ -327,7 +446,7 @@ export default function Home() {
               {funnel.map((step, index) => (
                 <div className="funnel-step" key={step.label}>
                   <div className="funnel-bar" style={{ width: `${100 - index * 10}%` }}>
-                    <span>{step.label}</span><strong>{step.value}</strong>
+                    <span>{step.label}</span><strong><MotionNumber value={step.value} /></strong>
                   </div>
                   {index > 0 && <small>上一步转化 {step.rate}</small>}
                 </div>
@@ -338,15 +457,22 @@ export default function Home() {
 
           <div className="strategy-kpis">
             {strategyMetrics.map(([label, value, trend, tone]) => (
-              <article key={label}><span>{label}</span><strong>{value}</strong><small className={tone}>{trend} <i>较上期</i></small></article>
+              <article key={label}><span>{label}</span><strong><MotionNumber value={value} /></strong><small className={tone}>{trend} <i>较上期</i></small></article>
             ))}
           </div>
 
           <section className="panel experiment-panel section-anchor" id="ab-experiment">
             <div className="panel-header strategy-heading">
               <div><div className="live-badge"><span /> 运行中</div><h2>开场策略实验：经营异常触达</h2><p>EXP-2026-0712 · 餐饮商家 · 50/50 随机分流 · 已运行 12 天</p></div>
-              <button className="outline-action">查看实验报告</button>
+              <button className="outline-action" onClick={() => setReportExpanded((open) => !open)}>{reportExpanded ? "收起实验报告" : "查看实验报告"}</button>
             </div>
+            {reportExpanded && (
+              <div className="experiment-report">
+                <div><span>分层提升最大</span><strong>新商家 +11.2pp</strong><small>回复率方向性提升</small></div>
+                <div><span>置信区间</span><strong>[+5.1, +11.3]pp</strong><small>95% CI · 模拟</small></div>
+                <div><span>风险结论</span><strong>护栏无显著恶化</strong><small>建议保留 20% 长期对照</small></div>
+              </div>
+            )}
             <div className="hypothesis"><span>实验假设</span><p>包含<strong>具体损失、可能原因与行动建议</strong>的开场方式，比模糊异常提醒更能提升商家回复率和建议采纳率。</p></div>
             <div className="variant-grid">
               <article className="variant-card control">
@@ -382,7 +508,7 @@ export default function Home() {
                 <label><span>触发条件</span><div className="condition-box"><b>当</b><select><option>套餐支付转化率</option></select><select><option>连续7日下降</option></select><input defaultValue="10%" /><button>＋</button></div></label>
                 <div className="prompt-pair"><label><span>A组 · 基线Prompt</span><textarea defaultValue="您最近的经营数据存在异常，点击查看详情。" /></label><label><span>B组 · 实验Prompt</span><textarea defaultValue="您的套餐曝光上涨{{exposure_lift}}，但每天少成交约{{lost_orders}}单，可能与{{reason}}有关。我整理了3条优化建议。" /></label></div>
               </div>
-              <aside className="traffic-card"><span>流量分配</span><div className="traffic-orbit"><strong>{traffic}%</strong><small>B组流量</small></div><input type="range" min="10" max="90" value={traffic} onChange={e=>setTraffic(Number(e.target.value))}/><div className="traffic-labels"><span>A组 {100-traffic}%</span><span>B组 {traffic}%</span></div><dl><div><dt>预计样本量</dt><dd>48,000</dd></div><div><dt>预计周期</dt><dd>14天</dd></div><div><dt>最小检测效应</dt><dd>+3.0pp</dd></div></dl></aside>
+              <aside className="traffic-card"><span>流量分配 · 拖动实时测算</span><div className="traffic-orbit" style={{"--traffic": `${traffic * 3.6}deg`} as CSSProperties}><strong>{traffic}%</strong><small>B组流量</small></div><input aria-label="B组流量比例" type="range" min="10" max="90" value={traffic} onChange={e=>setTraffic(Number(e.target.value))}/><div className="traffic-labels"><span>A组 {100-traffic}%</span><span>B组 {traffic}%</span></div><dl><div><dt>A / B 样本</dt><dd>{aSamples.toLocaleString()} / {bSamples.toLocaleString()}</dd></div><div><dt>预计周期</dt><dd>{estimatedDays}天</dd></div><div><dt>统计功效</dt><dd>{traffic >= 35 && traffic <= 65 ? "92%" : "78%"}</dd></div></dl></aside>
             </div>
             <div className="metric-selector"><div><span>主要指标</span>{["商家回复率","建议采纳率","任务完成率"].map(x=><label key={x}><input type="checkbox" defaultChecked />{x}</label>)}</div><div><span>护栏指标</span>{["退订率 < 0.8%","投诉率 < 0.2%","错误建议率 < 1%","人工转接率 < 8%"].map(x=><label key={x}><input type="checkbox" defaultChecked />{x}</label>)}</div><button onClick={()=>setNotice("实验草稿已创建，可进入审批流程")}>创建实验草稿 →</button></div>
           </section>
@@ -433,7 +559,7 @@ export default function Home() {
             <div className="annotation-layout">
               <div className="case-context"><header><span>商家案例</span><b>零售 · 库存积压 · 高风险</b></header><dl><div><dt>经营事实</dt><dd>即饮咖啡库存周转天数由 21 天升至 46 天，近 14 日销量下降 32%，毛利率 18%。</dd></div><div><dt>约束条件</dt><dd>商家最低可接受毛利率为 12%；价格或预算调整必须二次确认。</dd></div></dl><div className="model-answer"><span>模型回答 · Prompt v2.5-rc1</span><p>建议将即饮咖啡统一降价30%并立即上线清仓活动，预计7天内清理80%库存。</p></div><div className="evidence-alert"><span>!</span><p><strong>自动风险提示</strong>：建议价格会使毛利率低于商家约束，且包含未经依据验证的效果承诺。</p></div></div>
               <div className="score-form"><header><span>八维评分</span><small>1 = 严重不符合 · 5 = 完全符合</small></header>{["问题判断准确","数据引用正确","建议可执行","符合行业特点","无虚构数据","语气适合商家","无违规承诺","高风险操作确认"].map((name,i)=><div className="score-row-form" key={name}><span>{name}</span><div>{[1,2,3,4,5].map(score=><button className={scores[i]===score?"active":""} onClick={()=>setScores(current=>current.map((v,idx)=>idx===i?score:v))} key={score}>{score}</button>)}</div></div>)}</div>
-              <aside className="error-panel"><span>严重错误标签</span>{["违反商家约束","虚构效果承诺","未要求二次确认","可能造成经济损失"].map(x=><label key={x}><input type="checkbox" checked={severeError} onChange={()=>setSevereError(!severeError)} />{x}</label>)}<label className="note-label"><span>标注说明</span><textarea defaultValue="建议改为分层折扣实验，并先测算12%毛利率约束下的最大折扣；上线前必须由商家确认。" /></label><div className="score-total"><span>综合得分</span><strong>{(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2)}</strong></div><button onClick={()=>{setAnnotationIndex(i=>Math.min(149,i+1));setNotice("标注已提交，已进入下一条案例")}}>提交并进入下一条</button></aside>
+              <aside className="error-panel"><span>严重错误标签 <b>{severeErrors.length ? `${severeErrors.length} 项已选` : "未选择"}</b></span>{["违反商家约束","虚构效果承诺","未要求二次确认","可能造成经济损失"].map(x=><label key={x}><input type="checkbox" checked={severeErrors.includes(x)} onChange={()=>toggleSevereError(x)} />{x}</label>)}<label className="note-label"><span>标注说明</span><textarea defaultValue="建议改为分层折扣实验，并先测算12%毛利率约束下的最大折扣；上线前必须由商家确认。" /></label><div className="score-total"><span>综合得分</span><strong>{(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2)}</strong></div><button onClick={()=>{setAnnotationIndex(i=>Math.min(149,i+1));setScores([4,5,4,4,5,4,5,5]);setSevereErrors([]);setNotice("标注已提交，已进入下一条案例");window.setTimeout(()=>setNotice(""),2200)}}>提交并进入下一条</button></aside>
             </div>
           </section>
 
