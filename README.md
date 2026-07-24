@@ -1,8 +1,35 @@
 # 商智 AI 经营顾问
 
+![商智 AI 商家经营顾问项目封面](./public/og-v3.png)
+
+[在线体验](https://shangzhi-ai-advisor.shangzhi-ai.workers.dev/) ·
+[商家经营端](https://shangzhi-ai-advisor.shangzhi-ai.workers.dev/merchant) ·
+[AI 产品运营后台](https://shangzhi-ai-advisor.shangzhi-ai.workers.dev/ops)
+
 面向本地生活商家的 AI 产品经理原型项目。项目没有正式上线，也没有使用真实
 商家数据；经营指标、访谈、实验结果、行业基准和评测案例均为模拟数据，用于
 展示完整产品方法和可运行的 Agent 交互。
+
+## 产品全景
+
+### 1. 项目首页
+
+说明产品定位、双角色边界、产品架构以及作品集交付物。
+
+[![商智项目首页](./public/screenshots/01-project-home.png)](https://shangzhi-ai-advisor.shangzhi-ai.workers.dev/)
+
+### 2. 商家经营端
+
+面向单店商家，展示本店经营数据、AI 诊断建议、行动任务和商圈竞品。
+
+[![商家经营工作台](./public/screenshots/02-merchant-workspace.png)](https://shangzhi-ai-advisor.shangzhi-ai.workers.dev/merchant)
+
+### 3. AI 产品运营后台
+
+面向内部产品、算法和运营团队，展示沟通漏斗、A/B 实验、模型评测、
+Badcase、版本对比与运行监控。
+
+[![AI 产品运营与评测中心](./public/screenshots/03-ops-console.png)](https://shangzhi-ai-advisor.shangzhi-ai.workers.dev/ops)
 
 网站按真实角色拆成三个入口：
 
