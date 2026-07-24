@@ -28,6 +28,16 @@
 本项目当前是作品集与可运行 Demo，不接入真实商家后台，也不应直接用于真实
 经营决策。后续接入订单、流量、评价、营销和库存等授权数据后，才具备生产化基础。
 
+## 作品集交付物
+
+- [详细 PRD v2.0（38 页）](./public/assets/shangzhi-prd.docx)：包含三级目录、
+  页面级需求 ID、字段与状态、Agent 流程、Prompt/Schema、A/B 实验、标注评测、
+  Badcase、接口、埋点、权限、异常处理、UAT 和上线准入；
+- [PRD v1.0 归档版](./public/assets/shangzhi-prd-v1.0.docx)：保留原始摘要版本，
+  便于对比文档迭代过程；
+- [项目作品集 PPT](./public/assets/shangzhi-portfolio.pptx)：用于面试演示；
+- [模型评测数据集](./public/assets/shangzhi-evaluation-dataset.xlsx)：用于离线评测与标注演示。
+
 ## 核心功能
 
 | 使用角色 | 核心功能 | 解决的问题 |
